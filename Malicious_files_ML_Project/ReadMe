@@ -1,3 +1,5 @@
+This is the Final project from "Intro to Machine Learning" course as a part of "Digital Science" Bachelor's degree.
+
 In this project we were given several features about executable (exe) files, and our task was to decide if the file is malicious or not, 
 Through static analysis of the files - that is, analyzing the information about the files without running them.
 
