@@ -1,0 +1,827 @@
+---
+title: "statintro_final_Amit_Ziv.Rmd"
+output: html_document
+date: '2022-05-12'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Intro to Statistics and Data Analysis with R - Final Project - Ziv Barel & Amit Carsenti
+
+
+## import libraries
+
+```{r, include=FALSE}
+install.packages("readr", repos = "http://cran.us.r-project.org")
+```
+```{r, include=FALSE}
+install.packages("tidyverse", repos = "http://cran.us.r-project.org")
+```
+```{r, include=FALSE}
+install.packages("tidytuesdayR", repos = "http://cran.us.r-project.org")
+```
+```{R, include=FALSE}
+install.packages("gridExtra", repos = "http://cran.us.r-project.org")
+```
+
+```{r, include=FALSE}
+install.packages("dplyr", repos = "http://cran.us.r-project.org")
+```
+```{r, include=FALSE}
+install.packages("ggplot2", repos = "http://cran.us.r-project.org")
+```
+```{r, include=FALSE}
+install.packages("measurements", repos = "http://cran.us.r-project.org")
+```
+```{r, include=FALSE}
+install.packages("BSDA", repos = "http://cran.us.r-project.org")
+```
+```{R, include=FALSE}
+install.packages("scales", repos = "http://cran.us.r-project.org")
+```
+```{R, include=FALSE}
+install.packages("corrplot", repos = "http://cran.us.r-project.org")
+```
+
+We used the following libraries:
+
+1. readr
+
+2. tidyverse
+
+3. tidytuesdayR
+
+4. dplyr
+
+5. ggplot2
+
+6. measurements
+
+7. gridExtra
+
+8. BSDA
+
+9. scales
+
+10. corrplot
+
+```{R, include=FALSE}
+library(readr)
+library(tidyverse)
+library(tidytuesdayR)
+library(dplyr)
+library(ggplot2)
+library(measurements)
+library(gridExtra)
+library(BSDA)
+library(scales)
+library(corrplot)
+```
+## Background 
+
+In this markdown we will analyze Coffee Ratings data set. 
+The data set we are working with provide information about coffee from different countries in the world. The data comes from Coffee Quality Database courtesy of Buzzfeed data scientist James LeDoux. 
+There is data for the two most economically important varieties of coffee plants around the world - Arabica and Robusta. As it written in Wikipedia, almost 60% of the coffee produced worldwide is Arabica and the rest is Robusta. That data includes variety of scoring to the coffee beans (acidity, sweetness, balance, etc.)
+
+Data Source - https://github.com/rfordatascience/tidytuesday/blob/master/data/2020/2020-07-07/readme.md
+
+## Goals
+
+The goal of this project is to demonstrate and practice the different elements we have been talking about, which
+are a part of most data analysis/data science projects.
+
+we will focus on those parameters;
+1. Final grade
+2. different grades that effect the final grade (flavor, acidity, aftertaste, etc.)
+3. harvest year
+4. altitude
+
+* we will try to find the parameters that that are strongly related to the final grade coffee beans gets (we will do that by create a linear regression)
+* we will try to understand the relationship between the species and the final grade (by F test for the variances)
+
+## Import, tidying and Exploring the data
+
+```{r}
+data <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-07-07/coffee_ratings.csv')
+class(data) # check the class of the data - Data Frame
+```
+First we can see that our data has 1339 observations and 43 different columns (features). The data is already data frame, so it will be easy to work with and we don't need to change it to data frame. 
+In order to understand the data set we will check some information and visualizations. 
+
+As the first step of exploring the data, we will take look at the first 10 observations.
+
+```{r}
+head(data, 10)
+```
+
+First we will check the type of each feature (column) in the data
+
+```{r}
+glimpse(data)
+```
+
+Our data includes strings and numbers only. there are a lot of feature we might won't use them all, but in order to decide which features we want we need to understand the data better, in order to to that we will do the following steps;
+
+1. check how many unique values each features get
+
+2. check the ratio of NA's values each feature has - if we will find out that there are features with a lot of NA's we will remove them 
+
+3. remove features that might be difficult to understand  - such as certification address & certification contact 
+
+
+```{R}
+# find how many unique values each feature has 
+count_unique_values <- rapply(data, function(x) length(unique(x)))
+count_unique_values
+```
+
+As can be seen  - the data describes coffee beans from 37 different countries, 357 regions, 572 different farms, 692 producers, and there is data for 47 different years. 2 species of coffee beans are described in the data.
+
+We would like to find the precentage of missing values in the data. and also for every feature. Data with high ratio of NA's values will be hard to work with and analyze. 
+
+
+```{r}
+# find the percentage of missing values 
+
+mean(is.na(data)) # find the percentage of missing values in the data
+colMeans(is.na(data)) # find the percentage of missing values (NA's) by column 
+
+```
+
+Overall, there are 6.9% missing values in the data. 
+By looking at the percentage of missing values in each column (feature) we can see that lot_number is the feature with the highest NA's ratio (almost 80% of this column is non available), therefore we decided to remove this column. we also want to remove features that we think will be hard to deal with - certification address & certification contact. those features are hard to understand and we decide that they are not relevant for our models and questions. after exploring all the data we will remove all the features we found out that are not useful for us. 
+
+
+For now we would not deal with other features that has NA's. 
+We will try to understand some other features that are available in the data, by looking and their statistic summary, it will help us decide if we need to do some tranformations to those features or remove them. 
+
+```{R}
+as.data.frame(table(data$species))
+```
+
+As can be seen, most of the observations in the data (1311/1339) are Arabica coffee beans. This is almost 98% of the data. This fact might effect our results when we would like to check if there is any difference between the final grade each species gets (since the Arabica sample is huge while the Robusta sample is really small). 
+
+```{R}
+as.data.frame(table(data$category_one_defects))
+```
+
+We can see that the feature category_one_defects can get values between 0-12, 15,20,23,31,63, but most observations got value 0 (1137 observations), and few got values above 2.
+
+```{r}
+as.data.frame(table(data$category_two_defects))
+```
+
+The range of the values the feature category_two_defects is much bigger than the range of the values category_one_defects get. Most observations got value between 0-4 (include). 
+Since we don't understand those features and we think they won't be useful for us, we decide to remove them from the data. 
+
+```{r}
+table(data$quakers)
+```
+
+Most observations got value 1 for the feature "quakers". Since we don't understand this feature we will remove it later. 
+
+We also need to make sure that all the the observations in each feature are in the same measurement unit. 
+
+```{r}
+as.data.frame(table(data$unit_of_measurement))
+```
+
+We can see that there are 182 observations that there were measured in ft. Since this feature related to all the altitude features, we will change all the altitude features that are in ft to meters
+
+```{r echo = T, results = "hide"}
+toString(data$unit_of_measurement) # first we will convert this feature to string in order to compare it later
+index <- data$unit_of_measurement == "ft" # create index for rows where unit of measurements is in ft
+# now we will replace all the altitude features from ft to meters. we will find those observations by the index we had created above
+data$altitude_high_meters[index] <- data$altitude_high_meters[index]/0.3048
+data$altitude_low_meters[index] <- data$altitude_low_meters[index]/0.3048
+data$altitude_mean_meters[index] <- data$altitude_mean_meters[index]/0.3048
+# after convert all the relevant values to meters,  we can change all the measurement units to meters back 
+data$unit_of_measurement[index] <- "m"
+```
+Since we are interested to find if there are any differences between the years, we will look at the range of the harvest year we have in the data. By looking at the raw data we have seen that there are observation with month instead of year. We would like to remove those observations. Also, the original type of this feature is character and we would like to change it to a string. 
+
+```{R echo = T, results = "hide"}
+class(data$harvest_year) # check the original type of this feature - character
+strtoi(data$harvest_year) # we will change the type of this feature to int - in that way observations with non numeric value will be changed to NA
+sum(is.na(data$harvest_year)) # we will find out how many observations has NA value right now - only 47. 
+```
+We found out that after transformed this feature we left with 47 NA's. After change all the values in the feature "harvest year" to int we would like to find the range of the years described in the data. 
+
+```{R}
+data$harvest_year <- as.integer(data$harvest_year) # change the column to int type
+summary(data$harvest_year) # find out some statistics of the variable
+```
+The earliest year described in the data is 2010 and the latest is 2018. The number of NA'S increased (beacuse there where strings like "2010-2011" and the changing the column to int type has changed them to NA's). 
+
+We will find out how many different processing methods are described in the data
+
+```{R}
+as.data.frame(table(data$processing_method))
+```
+
+The most popular processing method for the beans described in this data is "Washed/Wet". 
+
+#Remove columns
+
+Now we will remove all the features we thought won't be useful for us, and create our Final subset data, we will work with. 
+
+Except from the features we had decided to remove above, we will remove some other features from the following reasons;
+
+1. mill - the features indicates the mill where the beans were produced. this features has high NA's values ratio (23.52%) and a lot of possible values (461) so it will be hard to deal with and also not important for our questions. 
+2. expiration - Expiration date of the beans - it might be interesting to check if there is any relationship between the expiration date and some other features in the data, but since this feature has a lot of unique values (566), we decide to remove it. 
+
+3. ico_number - International Coffee Organization number - this feature has a lot of unique values (848), and therefore it will be hard to check if this feature has any relationship to the final grade (even tough we think that there is such a relation). 
+
+4. grading date - this feature has 567 unique values. it will be hard to check relation between the grades and this feature since there a lot of unique values, even though it might be interesting. this feature is also not so relevant for our questions. 
+
+5. producer - this feature has 692 unique values. it will be hard to check relation between the grades and this feature since there a lot of unique values and so many observations. 
+
+6. farm name - this feature has 572 unique values. it will be hard to check relation between the grades and this feature since there a lot of unique values and so many observations. 
+
+7. company & owner_1 & owner - we will remove those features from the same reasons we had decided to remove the "farm name" feature. there are 282 unique values for "company" feature and 320 unique values for "owner_1" feature, and 316 unique values for "owner" feature. 
+
+8. in country partner - indicades partner of the country. we don't need this feature for our questions. 
+
+9. altitude - we will remove this cloumns since this is the range of the other altitude features. 
+
+10. bag_weight - We decided to remove the column since we won't use it in our project.
+
+11. number_of_bags - We decided to remove the column since we won't use it in our project.
+
+12. region - the region column is not helpful since we can't compare and check the values duo to the lack of consistency.
+
+13. unit_of_measurement - we transferred all the unit to be in m.
+
+14. variety - the variety of the bean doesn't add a new crucial information for our goals and analysis.
+
+
+```{R}
+# remove columns
+cols_to_drop <- c("lot_number", "certification_address", "certification_contact", "category_one_defects", "category_two_defects", "mill", "expiration", "ico_number", "grading_date", "producer", "farm_name", "company", "owner_1", "owner", "quakers", "in_country_partner", "altitude", "bag_weight", "number_of_bags", "region", "unit_of_measurement", "variety")
+final_data = data[,!(names(data) %in% cols_to_drop)]
+```
+
+Since there are some observations that got total cup point 0 we would like to remove them from the final data set we gonna work with so they wouldn't divert the results. 
+
+```{R}
+# if total cup points == 0, we would like to remove this row 
+final_data = final_data[!(final_data$total_cup_points == 0.00),]
+```
+
+We will look at the data once again in order to check all the transformations and changes above has worked correctly.
+
+```{r}
+head(final_data, 10)
+```
+
+Since we would like to test if there are any differences between the final grades coffee beans from different countries get, we will create two samples - coffee beans from the "East" and coffee beans from the "West" 
+
+```{R}
+final_data = final_data%>%
+  mutate(place = case_when(
+    endsWith(country_of_origin, "mexico") ~ "West",
+    endsWith(country_of_origin, "Colombia") ~ "West",
+    endsWith(country_of_origin, "Guatemala") ~ "West",
+    endsWith(country_of_origin, "Brazil") ~ "West",
+    endsWith(country_of_origin, "United States (Hawaii)") ~ "West",
+    endsWith(country_of_origin, "Costa Rica") ~ "West",
+    endsWith(country_of_origin, "United States (Puerto Rico)") ~ "West",
+    endsWith(country_of_origin, "United States") ~ "West",
+    endsWith(country_of_origin, "El Salvador") ~ "West",
+    endsWith(country_of_origin, "Haiti") ~ "West",
+    endsWith(country_of_origin, "Honduras") ~ "West",
+    endsWith(country_of_origin, "Peru") ~ "West",
+    endsWith(country_of_origin, "Panama") ~ "West",
+    endsWith(country_of_origin, "Ecuador") ~ "West",
+    endsWith(country_of_origin, "Nicaragua") ~ "West",
+    endsWith(country_of_origin, "Cote d?Ivoire") ~ "West",
+    endsWith(country_of_origin, "Thailand") ~ "East",
+    endsWith(country_of_origin, "India") ~ "East",
+    endsWith(country_of_origin, "Laos") ~ "East",
+    endsWith(country_of_origin, "Philippines") ~ "East",
+    endsWith(country_of_origin, "Myanmar") ~ "East",
+    endsWith(country_of_origin, "Indonesia") ~ "East",
+    endsWith(country_of_origin, "Japan") ~ "East",
+    endsWith(country_of_origin, "Papua New Guinea") ~ "East",
+    endsWith(country_of_origin, "Vietnam") ~ "East",
+    endsWith(country_of_origin, "China") ~ "East",
+    endsWith(country_of_origin, "Tanzania, United Republic Of") ~ "East",
+    endsWith(country_of_origin, "Zambia") ~ "East",
+    endsWith(country_of_origin, "Uganda") ~ "East",
+    endsWith(country_of_origin, "Mauritius") ~ "East",
+    endsWith(country_of_origin, "Burundi") ~ "East",
+    endsWith(country_of_origin, "Kenya") ~ "East",
+    endsWith(country_of_origin, "Rwanda") ~ "East",
+    endsWith(country_of_origin, "Ethiopia") ~ "East"
+    ))
+
+```
+
+## visualizations 
+
+First we will look at the distribution of the bean's origin country 
+
+```{R}
+# create subset data with the number of observations from each country
+country_vec = c(final_data %>%
+  count(country_of_origin, sort = T,)%>%
+  na.omit())
+country_df<- data.frame(country_vec)
+
+```
+
+```{R country of origin distribution}
+# create plot for the number of observations from each country
+ggplot(data = country_df, aes(x = n, y = reorder(country_of_origin, -n))) + 
+  geom_bar(stat = 'identity', colour = "white", fill = "green") +
+  ggtitle("Number of observations by country") +
+  xlab("Number of observations") +
+  ylab("country")
+```
+
+As can be seen in the plot above, most of the observations in the data are from Mexico. there are only few observations from Zambia, Rwanda, Papua New Guinea, Mauritius, Japan. 
+
+We would like to see how the color of the bean is related to the total cup points
+
+```{R}
+color_data = final_data%>%
+  filter(!is.na(color))%>%
+  filter(color == c("Green", "Bluish-Green", "Blue-Green"))
+
+mean_of_color = data.frame(aggregate(color_data$total_cup_points, list(color_data$color), FUN=mean))
+  
+mean_total = mean(final_data$total_cup_points)
+```
+
+```{r}
+mean_of_color$diff <- mean_of_color$x-mean_total
+
+```
+
+```{R}
+  ggplot(data = mean_of_color, aes(x = Group.1, y = diff)) + 
+  geom_bar(stat = 'identity', colour = "white", fill = "#33FF99") +
+  ggtitle("Color and  mean of total points corelation") +
+  xlab("Color") +
+  ylab("Mean of total points")
+```
+
+We can see that the Bullish-Green type of color gets on average 1.1 more points then the other types.
+
+Now, We would like to show the difference between the number of observation from the west and the east
+```{R}
+# create a subset data with the number of observations from each part of the world
+place_vec = c(final_data %>%
+  count(place, sort = T,)%>%
+  na.omit())
+place_df<- data.frame(place_vec)
+```
+
+```{R}
+blank_theme <- 
+  theme_minimal() + 
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    panel.border = element_blank(),
+    panel.grid = element_blank(),
+    axis.ticks = element_blank(),
+    plot.title = element_text(size=14, face="bold")
+  )
+```
+
+```{R}
+# create pie chart to show how many observations we have from each part of the world
+ggplot(data = place_df, aes(x = "", y =n, fill=place)) + 
+  geom_bar(stat = 'identity', width=1)+
+  coord_polar("y", start=0)+
+   theme_void() + 
+  blank_theme + 
+  scale_fill_brewer("Blues") +
+  ggtitle("Distribution of observations from the East and from the West") +
+  theme(plot.title = element_text(hjust=0.5)) +
+  theme(axis.text.x = element_blank()) + 
+  geom_text(aes(y = n/2 + c(0, cumsum(n)[-length(n)]),
+                label = percent(n/1000)), size=5)
+```
+
+Only 26% of the observations are from the "East". 
+
+We would like to compare each specie and check the altitude it is growing
+```{R}
+height_plot_data = final_data%>%
+  group_by(species)%>%
+  select(altitude_mean_meters)
+
+height_plot_data$altitude_mean_meters[height_plot_data$altitude_mean_meters < 100] <- 0
+height_plot_data$altitude_mean_meters[height_plot_data$altitude_mean_meters > 6100] <- 0
+
+height_plot_data = height_plot_data%>%
+  na.omit()%>%
+   filter(altitude_mean_meters != c(0))
+ggplot(height_plot_data, aes(x=species, y=altitude_mean_meters)) + 
+  geom_boxplot()+
+  ggtitle("Altitude as a function of specie") +
+  xlab("Specie") +
+  ylab("Altitude")
+```
+
+As you can see, on average, the Arabica specie grows at a higher altitude then the Robusta specie.
+
+The exact average height is:
+```{  R}
+aggregate(height_plot_data$altitude_mean_meters, list(height_plot_data$species), FUN=mean)
+```
+
+Since there are few process methods in the data we would like to find out how many observations there are in each processing method.
+```{R}
+# create a subset data to count how many observations there are for each processing method
+process_sb <- c(final_data %>%
+                  count(processing_method, sort=T,) %>%
+                  na.omit())
+process_df <- data.frame(process_sb)
+
+# plot 
+barplot(process_sb$n, border = F, names.arg = process_df$processing_method,
+        main = "Number of observations for each processing method",
+        col = "Brown")
+```
+
+
+Lets look at the distribution of the feature total cup points
+
+```{R}
+ggplot(data = final_data, aes(x = total_cup_points )) + 
+  geom_density() +
+  ggtitle("Total cup point distribution")+
+  theme(plot.title = element_text(hjust=0.5)) +
+  xlab("Total cup points")
+  ylab("Total cup points")
+```
+
+As can be seen from the total cup points density distribution plot, there are no observations who got less than 60 in the total cup point grade. 
+Most observations got total grade somewhere around80-50, and it looks almost like "normal distribution"with mean of ~83).
+
+Before we test it by linear model, we would like to find out if there are differences in the final score between the different species. In order to that we will try to look at the boxplot of the final score by species 
+
+```{R}
+# create subset data for final score by species
+fc_species <- final_data %>%
+  select(total_cup_points, species) %>%
+  group_by(species) 
+
+# boxplot 
+boxplot(total_cup_points ~ species, 
+        data = fc_species,
+        main = "Boxplots - final grade for each species",
+        xlab = "Species",
+        ylab = "Toatal cup points",
+        col = "pink",
+        border = "brown")
+```
+
+As can be seen the 1st quantile, 3rd quantile and median of the final grade is almost the same for the Arabica coffee beans and the Robusta (Arabica coffee beans 1st quantile, median and 3rd quantile of the final grade are little higher). the minimum grade is exactly the same for both species, while the maximum grade for Arabica coffee beans is much higher. Also we can see from the bosplots that there are only two outliers for Robusta coffee beans, while Arabica coffee beans has a lot of outliers. 
+
+we would like to find out how many outliers there are for Arabica's coffee beans total grade 
+```{R}
+fc_arabica <- subset(fc_species, species=="Arabica")
+arabica_fc_outliers <- boxplot(fc_arabica$total_cup_points, plot = F)$out
+arabica_fc_outliers <- length(arabica_fc_outliers)
+boxplot(fc_arabica$total_cup_points, col= "orange",
+       main = "Arabica Coffee beans total cup point",
+       sub = paste("Numebr of outliers: ",arabica_fc_outliers))
+```
+
+Scatter plot - processing method & total cup points 
+
+```{R}
+ggplot(final_data, aes(x=flavor, y=total_cup_points, col=processing_method))+
+  geom_point()
+```
+
+As can be seen in the scatter plot above, there are almost no observations of coffee beans that have been processed in any other way except of washed/net who got flavor grade less than 7. most observations processing method is washed/net 
+
+```{r}
+ggplot(final_data, aes(total_cup_points)) +
+  geom_density(aes(fill=processing_method), alpha=0.8) + 
+  labs(title = "Total cup points density by processing method", 
+       x = "Total cup points",
+       fill = "Processing method")
+```
+
+
+The density of the final grade distribution is almost the same for all the different processing method, all of them are almost normal, except of the "other" processing method. in order to accurate more the differences in the final grade between the different processing method we will look at the boxplots
+
+```{r}
+ggplot(final_data, aes(total_cup_points)) + 
+  geom_boxplot(aes(varwidth = T, fill = processing_method))
+```
+
+plot to check the relation between certification body and the final grade
+
+```{r}
+unique(final_data$certification_body) # there are 26 different certifications body
+
+# now we will find how many observations related to each certification body
+certification_vec = c(final_data %>%
+  count(certification_body, sort = T,)%>%
+  na.omit())
+certification_df<- data.frame(certification_vec)
+
+# create pie char
+ggplot(data = certification_df, aes(x = n, y = reorder(certification_df$certification_body, -n))) + 
+  geom_bar(stat = 'identity', colour = "white", fill = "pink") +
+  ggtitle("Number of observations by certification_body") +
+  xlab("Number of observations") +
+  ylab("certification body")
+
+```
+
+
+as can be seen there are only few observations that are related to some certification bodies. The most popular certification bodies in the data are specialty coffee association, AMECAFE, almacafe and Association Nacional Del Cafe. we will check if there are any diffrences in the final grades distribution between the top 4 certification bodies. 
+
+```{r}
+# create vector with the most popular certification bodies in the data
+top_4_cb <- c("Specialty Coffee Association", "AMECAFE", "Almacafé", "Asociacion Nacional Del Café")
+
+# create subset data for those certification bodies
+certification_fg <- final_data %>%
+  filter(certification_body %in% top_4_cb)
+```
+
+
+```{r}
+ggplot(certification_fg, aes(total_cup_points)) +
+  geom_histogram(aes(fill=certification_body), alpha=0.8) + 
+  labs(title = "Total cup points histogram by certification body", 
+       x = "Total cup points",
+       fill = "Certification body")
+```
+
+As can be seen in the graph of total cup points histogram by certification body, most of the observations related to "Almcafe" certification body. the variance in the total cup point of beans that are related to "Almcafe" is the smallest while the variance of those who are related to "AMECAFE" and "Specialty Coffee Association" is the largest. 
+Moreover, there are almost no observations that are related to the 4 most popular certification bodies who got less than 70 in the total cup points grade (only 2 observations)
+
+
+plot to check if there is any correlation between the harvest year and the final grade 
+
+```{r}
+boxplot(total_cup_points~harvest_year,
+       data = final_data,
+       main = "Boxplots - total cup points grade for each harvest year",
+       xlab = "Harvest year",
+       ylab = "Total cup points",
+       col = "lightblue",
+       fill = "white")
+```
+
+As can be seen in the boxplots, the mean of total cup points was the highest for observations from harvest year of 2010. also the Interquartile  for the total cup points is the largest for that year (2010). there are a lot of outliers in observations from harvest year 2012 and 2014. Just from the boxplots, ee might think that observations from harvest year - 2010 are more likely to get higher total cup points values. 
+
+We would like to find out the distribution of each parameter that effect the final grade
+
+```{R}
+# first we will define a list with all the relevant features
+final_grade_parameters <- c("aroma", "flavor", "aftertaste", "acidity", "body", "balance", "uniformity", "clean_cup", "sweetness", "cupper_points", "moisture")
+
+# we will create a subset data with the relevant features
+grades_data <- final_data %>%
+  select(final_grade_parameters)
+
+# now we will plot the distribution of each column in the subset data
+density_aroma <- ggplot(data=grades_data, aes(aroma)) + geom_density(col="white",fill="pink", alpha=0.5) + ggtitle("Density Plot of aroma") + theme(plot.title = element_text(size = 7, face = "bold")) 
+density_flavor <- ggplot(data=grades_data, aes(flavor)) + geom_density(col="white", fill="darkorchid", alpha=0.5) + ggtitle("Density Plot flavor") + theme(plot.title = element_text(size = 7, face = "bold"))
+density_aftertaste <- ggplot(data=grades_data, aes(aftertaste)) + geom_density(col="white", fill="orange", alpha=0.5) + ggtitle("Density Plot of aftertaste")+ theme(plot.title = element_text(size = 7, face = "bold"))
+density_acidity <- ggplot(data=grades_data, aes(acidity)) + geom_density(col="white", fill="firebrick", alpha=0.5) + ggtitle("Density Plot of acidity") +theme(plot.title = element_text(size = 7, face = "bold"))
+density_body <- ggplot(data=grades_data, aes(body)) + geom_density(col="white", fill="slateblue1", alpha=0.5) + ggtitle("Density Plot of body") +theme(plot.title = element_text(size = 7, face = "bold"))
+density_balance <- ggplot(data=grades_data, aes(balance)) + geom_density(col="white", fill="mediumturquoise", alpha=0.5) + ggtitle("Density Plot of balance") +theme(plot.title = element_text(size = 7, face = "bold"))
+density_uniformity <- ggplot(data=grades_data, aes(uniformity)) + geom_density(col="white", fill="blue", alpha=0.5) + ggtitle("Density Plot of uniformity") +theme(plot.title = element_text(size = 7, face = "bold"))
+density_clean_cup <- ggplot(data=grades_data, aes(clean_cup)) + geom_density(col="white", fill="green", alpha=0.5) + ggtitle("Density Plot of clean cup") +theme(plot.title = element_text(size = 7, face = "bold"))
+density_sweettness <- ggplot(data=grades_data, aes(sweetness)) + geom_density(col="white", fill="yellow", alpha=0.5) + ggtitle("Density Plot of sweetness")+theme(plot.title = element_text(size = 7, face = "bold"))
+density_cupper_points <- ggplot(data=grades_data, aes(cupper_points)) + geom_density(col="white", fill="pink", alpha=0.5) + ggtitle("Density Plot of cupper points") +theme(plot.title = element_text(size = 7, face = "bold"))
+density_moisture <- ggplot(data=grades_data, aes(moisture)) + geom_density(col="white", fill="red", alpha=0.2) + ggtitle("Density Plot of moisture")+theme(plot.title = element_text(size = 7, face = "bold"))
+
+grid.arrange(density_aroma, density_flavor, density_aftertaste, density_acidity, density_body, density_balance, density_uniformity, density_clean_cup,
+             density_sweettness, density_cupper_points, ncol=4)
+```
+
+As can be seen, almost all the parameters that were graded has the same distribution. there are no observations that got less than 6 in any parameter.
+
+We will create a correlation matrix in order to find out if there are some parameters of the final grade that are strongly correlated with other parameters
+
+```{R}
+cor_mat <- cor(grades_data) # create correlation matrix
+round(cor_mat, 2) # take only two digits after the point
+corrplot(cor_mat, order = "hclust") # plot the correlation matrix
+```
+
+From the correlation matrix we can see that the moisture grade is weakly negatively correlated with all the other grades. Sweetness is not correlated with most of the grades, except of uniformity and clean cup. the grades that are highly positively correlated are body, balance, aroma, acidity, cupper points, flavor and aftertaste. 
+
+Now, when we are better understand our data and transformed it and clean it, we will test our hypothesis and run some models.
+
+## Modeling 
+
+# Expected Value Test (Z.test)
+
+Now we will perform an expected value test to check the hypotheses that the place has no affect on the grade.
+
+  $H0$: $μ$(East) = $μ$(West)
+
+  $H1$: $μ$(East) != $μ$(West)
+
+Sigma is known and the number of observations are over 30 so we will use z.test.
+we will split our original data into two different data sets that will help us perform the test.
+```{R}
+east_ss =subset(final_data, place == "East")
+west_ss = subset(final_data, place == "West")
+sd_of_east = sd(east_ss$total_cup_points, na.rm = FALSE)
+sd_of_west = sd(west_ss$total_cup_points, na.rm = FALSE)
+```
+
+Now we will declare that the independent variable is place while the dependent variable is the final grade.
+We chose to use the formula code due to the fact that we use to different data sets.
+we chose alpha to be 5% so our rejection regions are:
+
+  Z0> $μ$+$Z$ 0.975(df = n-1)* $σ^2$ ^2 /n^0.5
+
+  Z0< $μ$-$Z$ 0.975(df = n-1)* $σ^$ 2^2 /n^0.5
+
+Now we will perform the test:
+```{R}
+z.test(east_ss$total_cup_points, west_ss$total_cup_points, alternative='two.sided', mu=0, sigma.x=sd_of_east, sigma.y=sd_of_west)
+```
+
+As it is shown in the results we reject the main hypothesis which means that the mean of the the beans from the east and the beans from the west is not equal.
+
+# S.D Test (Var.test)
+
+Now we would like to check the hypothesis that the standard variation of both the grades of both areas (east and west) are the same.
+In order to do that we will use the F.test.
+We assume that the distribution of the sets are Normal due to the fact that we have more than 30 samples and that they are Independents.
+Our hypothesis:
+
+  $H0$: $σ^2$(East) = $σ^2$(West)
+
+  $H1$: $σ^2$(East) =! $σ^2$(West)
+
+The independent variable is the species while the dependent variable is the final grade.
+We chose alpha to be 10% so our rejection regions are:
+  
+  $σ^2$(East)^2 /$σ^2$(West)^2 < $F$(0.05)(n1-1,n2-1)
+  
+  $σ^2$(East)^2 /$σ^2$(West)^2 > $F$(0.95)(n1-1,n2-1)
+
+
+```{R}
+var.test(east_ss$total_cup_points, west_ss$total_cup_points, alternative = "two.sided")
+```
+As it is shown in the results we reject the main hypothesis which means that the sd of the the beans from the east and the beans from the west is not equal.
+
+# goodness of fit 
+
+In order to check if the distribution of the total cup point is normal - we will do goodness of fit test (chi test). 
+
+before that,  we will create qq-plot for the total cup points distribution. qqplot draws the sample versus the theoretical distribution. 
+
+```{r}
+qqnorm(final_data$total_cup_points, pch = 1, frame = FALSE)
+qqline(final_data$total_cup_points, col = "blue", lwd = 2)
+```
+
+As can be seen from the qqplot, the distribution of the total cup points we have in our data is not exactly normal but really close to normal distribution. 
+
+Now we will do goodness of fit test in order to find out if the distribution is normal.
+
+our hypothesis will be the following:
+
+  * $H0$: Total cup points ~ $N(μ,σ^2)$
+  * $H1$: else
+  * reject the hypothesis if: $\chi_0^2>\chi_{\alpha,k-p-1}^2$.
+  
+more specifically we would like to check the following hypothesis:
+
+  * $H0$: Total cup points ~ $N(82.1512,2.68)$
+  * $H1$: else
+  
+  
+```{r}
+# define interval breaks for the total cup points (according to the density plot)
+total_cup_intervals <- c(60, 65, 70, 75, 80, 85, 90, 95, 100)
+sample_size <- length(final_data$total_cup_points)
+
+total_cup_dist <- final_data %>%
+  mutate(grades_scale = cut(total_cup_points, breaks = total_cup_intervals))
+
+tcp_mean <- mean(total_cup_dist$total_cup_points)
+tcp_mean
+tcp_v <- sd(total_cup_dist$total_cup_points)
+tcp_v
+```
+
+```{r}
+total_cup_chi_prep <- total_cup_dist %>% 
+   count(grades_scale, name = "observed") %>% 
+   mutate(upper_bound = total_cup_intervals[-1]) %>% 
+   mutate(lower_bound = total_cup_intervals[1:8]) %>% 
+   mutate(expected_prob = pnorm(q = upper_bound, mean = tcp_mean, sd = tcp_v)-
+             pnorm(q = lower_bound, mean = tcp_mean, sd = tcp_v)) %>% 
+   mutate(expected_prob =  expected_prob/sum(expected_prob)) %>% 
+   mutate(expected = expected_prob*500) %>% 
+   mutate(chi_comp = (observed-expected)^2/expected)
+```
+
+```{r}
+chi_emp <- sum(total_cup_chi_prep$chi_comp)
+chi_emp
+qchisq(p = 1-0.05, df = 8-1-1) # rejection value
+```
+
+since $23109041=\chi^2_0>\chi^2_{1338, 6}=12.59$, we reject the null hypothesis. According to the test result we will assume that the total cup points distribution is not normal (with those parameters we have tested).
+
+# Linear Regression Model
+
+We would like to find out the relation between the final grade (total cup point) and all the other grades (include bag weight) that might effect the final grade, if this is a simple linear relationship and the final grade is the sum of all the parameters. we will do it by a linear regression.
+
+The independent Variable - total cup point, and the dependent variables - aroma, flavor, aftertaste, acidity, body, balance, uniformity, clean_cup, sweetness, cupper_points, moisture. 
+
+```{R}
+LinearModel <- lm(total_cup_points ~ aroma + flavor + aftertaste + acidity + body + balance + uniformity + clean_cup + sweetness + cupper_points + moisture, data = final_data)
+```
+
+
+```{R}
+LinearModel
+```
+According to the Linear Model we define above, we got that the estimated total cup point is from the form;
+
+y = -0.0152 + 1*aroma + 0.99*flavor + 1*aftertaste + 0.99*acidity + 1*body + 1*uniformity + 1*clean_cup + 0.99*sweetness +0.99*cupper_points +0.00*moisture
+
+as can be seen each parameter that have been tested, except of moisture is lineary related to the final grades. All the parameters that have been tested have been graded between 0-10, therefore if all the parameters got 10 the final grade will be 100. 
+
+It was expected that those parameters will be linear y correlated to the final grade. 
+
+```{R}
+summary(LinearModel)
+```
+We can see that the first linear model is statistically significant in significant level of 5% (since the p-value of the whole model is really small). Also, all the dependent variables are statistically significant. This simple linear model has r-squared of 1 which means that those dependent variables explains all of the total cup points (other features that are available in the data might not effect the total cup point).
+
+Lets look at some relations between the final grade and other parameters gear 
+
+```{R}
+ggplot(final_data, aes(x = cupper_points, y=total_cup_points)) +
+  geom_point() + theme_bw() +
+  stat_smooth(method="lm") + xlab("Cupper points") + ylab("Total cup points")
+```
+
+As can be seen most of the samples got cupper points between ~6 to ~9. and few got 10 or 5. there is a positive correlation between the cupper point and the total cup points. 
+
+```{R}
+ggplot(final_data, aes(x = moisture, y=total_cup_points)) +
+  geom_point() + theme_bw() +
+  stat_smooth(method="lm") + xlab("Moisture") + ylab("Total cup points")
+```
+
+In the first linear regression we found that there is no relation between moisture grade and the total cup grade (coefficient of this variable was -0.0002361). 
+By looking at the plot above we can see it also since the curve is almost flat.
+
+```{R}
+scatter.smooth(x=final_data$aroma, y=final_data$total_cup_points, main="Total cup points ~ sweetness") 
+```
+
+We would like to find out how some other parameters (such as the species and the altitude) effect the final grade
+Since we believe the coffee beans species might effect the final grade, we would like to include this feature as a dummy variable in our regression 
+
+```{R}
+# create a dummy variable for Arabica coffee beans. if coffee species is Arabica, dummy variable = 1, else = 0
+final_data$Arabica <- ifelse(final_data$species == "Arabica", 1, 0)
+# create a dummy variable for East. if coffee species is from country in the east, dummy variable = 1, else = 0
+final_data$East <- ifelse(final_data$place == "East", 1, 0)
+```
+
+Now we will define another linear model, to check our hypothesis that the altitude and the species effect the final cup grade. The independent Variable - total cup point, and the dependent variables - altitude mean meters + Arabica (dummy variable) + East ( dummy variable)
+
+```{R}
+LinearModel2 <- lm(total_cup_points ~ altitude_mean_meters + Arabica + East, data = final_data)
+```
+
+Lets look at the regression results
+
+```{R}
+LinearModel2
+```
+According to the regression; y = 81.48 - 0.00001003altitude_mean_meters + 1.740Arabica + 0.907*East
+
+Those results shows us that the mean altitude is not related to the final grade, but there is a positive correlation between Arabica species and the final grade. if the coffee beans are "Arabica" there final grade will 1.740 higher (if all the others parameters are equal). Also there is a positive correlation between "East" and the final grade. If the coffee beans are from the "East" the final grade will be 0.907 points higher.
+
+```{R}
+summary(LinearModel2)
+```
+
+From the summary of the second linear model we see that the R squared is really low (3.3%), it means that those variables (altitude mean meters, Arabica species and Area) explain only few percentages of the total cup grade. Since the p-value of the regression is 3% and it is smaller than 5% we can say that our regression is statistically significant in significance level of 5%. But, not all the dependent variables are statistically significant - as can be seen by looking at the p-value of each variable we can see that in 5% significance level the dependent variable "altitude mean meters" is not statistically significant. Since "Arabica" and "East" variables are statistically significant in significance level of 5% we got the result that the whole model is statistically significant.  
+
+
+# Conclusion 
+
+In this project we have analyzed the Coffee beans data and tested some hypothesis concerning the data, while implementing methods we have learned in the course. Both the T-test and the second linear regression showed that there are differences in the final grade coffee beans get according to their region. By looking at the data as two samples (coffee beans from the east and coffee beans from the west) we found that their final grade's distribution is not equal and coffee beans from the west are more likely to get higher final grade.  
+
+
