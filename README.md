@@ -1,4 +1,4 @@
-# Amit Carsenti portfolio
+# Amit Carsenti Portfolio
 
 This document serves as the README file for Amit Carsenti's Private Portfolio. Currently in my third year of the Bachelor's program in Economics and Digital Science at Tel Aviv University, I present a selection of projects undertaken during my studies:
 
