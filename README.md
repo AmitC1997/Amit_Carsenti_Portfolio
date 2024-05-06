@@ -1,11 +1,8 @@
 # portfolio_private
 
-This is the Private Portfolio of Amit Carsenti
-I am at my third year of my Bachelor's degree in  economics / digital science program at Tel Aviv university.
+This document serves as the README file for Amit Carsenti's Private Portfolio. Currently in my third year of the Bachelor's program in Economics and Digital Science at Tel Aviv University, I present a selection of projects undertaken during my studies:
 
-Here are some of my projects I was working on during my Degree
-
-1. Final project at intro to Data Analysis course using R
-2. Final project at Machine learning course using Python
-3. A project at Machine learning course using Python
-4. A project at Deep learning cource using Python
+1. Coffee - Final project for the Introduction to Data Analysis course, implemented using R.
+2.  Malicious - Final project for the Machine Learning course, developed using Python.
+3.  Bikes - Additional Python project completed as part of the Machine Learning course.
+4.  NLP - Project completed within the Deep Learning course, utilizing Python.
